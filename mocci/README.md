@@ -58,4 +58,5 @@ WSGIScriptAlias /v1 /var/www/mocci/v1/mocciapi.py
 ```
 cd /etc/apache2/sites-available/
 sudo a2ensite mocci
+sudo /etc/init.d/apache2 restart
 ```
