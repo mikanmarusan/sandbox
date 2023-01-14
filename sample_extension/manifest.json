@@ -1,0 +1,12 @@
+{
+  "name": "Extension using OpenAI Completions",
+  "version": "0.0.1",
+  "manifest_version": 3,
+  "description": "Google Chrome Extension using OpenAI Completions",
+  "content_scripts": [{
+    "matches": ["https://*/*"],
+    "js": [
+      "js/content.js"
+    ]
+  }]
+}
