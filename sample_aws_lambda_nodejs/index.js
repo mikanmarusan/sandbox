@@ -1,6 +1,6 @@
 
 // Sample Lambda Function
-// 環境変数からBare
+// 環境変数からBaerer tokenを取得しAPIアクセスするコード
 
 const axios = require("axios");
 
