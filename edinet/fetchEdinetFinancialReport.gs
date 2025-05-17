@@ -18,22 +18,18 @@ function fetchEdinetFinancialReports() {
 
   // Pythonの timedelta(days=366) に相当。開始日は終了日の365日前。
   var startDate = new Date(today.getTime());
-  //startDate.setDate(today.getDate() - 366);
-  startDate.setDate(today.getDate() - 5);
-
-  Logger.info("begin to search resources from " +
-             Utilities.formatDate(startDate, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss') +
-             " to " +
-             Utilities.formatDate(endDate, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss'));
+  startDate.setDate(today.getDate() - 31);
 
   var currentDate = new Date(startDate.getTime()); // ループ用の現在日付（開始日からスタート）
-  var collectedPdfs = {}; // 取得したPDFのURLを格納するオブジェクト (キー: 証券コード)
+  var collectedDocumentId = {}; // 取得したPDFのURLを格納するオブジェクト (キー: 証券コード)
   var collectedFilerName = {}; // 取得した会社名を格納するオブジェクト (キー: 証券コード)
+  var collectedPdf = {}; // 取得した会社名を格納するオブジェクト (キー: 証券コード)
+  var collectedYahooFinance = {};
 
   // currentDateがendDateに達するまでループ (時刻も比較対象)
   while (currentDate.getTime() <= endDate.getTime()) {
     var dateString = Utilities.formatDate(currentDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-    Logger.log("searching resources on "  + dateString + " ...");
+    Logger.log(dateString);
 
     // APIリクエストのパラメータ
     var queryParams = {
@@ -80,46 +76,42 @@ function fetchEdinetFinancialReports() {
           // 有価証券報告書 (docTypeCode '120') のみ対象
           if (securityCode && docTypeCode === '120' && documentId) {
             var pdfUrl = `https://disclosure2dl.edinet-fsa.go.jp/searchdocument/pdf/${documentId}.pdf`;
-            collectedPdfs[securityCode] = pdfUrl;
+            var yahooUrl = `https://finance.yahoo.co.jp/quote/${securityCode}.T`;
+            collectedDocumentId[securityCode] = documentId;
             collectedFilerName[securityCode] = filerName;
-            Logger.log(securityCode + ": " + pdfUrl);
+            collectedPdf[securityCode] = pdfUrl;
+            collectedYahooFinance[securityCode] = yahooUrl;
+            Logger.log(securityCode + ": " + documentId);
           }
         });
       } else {
         Logger.warn("failed to get data " + dateString);
       }
     } catch (error) {
-      Logger.error(error.message + "\n stacktrace: " + error.stack);
+      Logger.log(error.message + "\n stacktrace: " + error.stack);
     }
 
-    // APIへの負荷を考慮し、1秒待機 (EDINET APIの利用規約に従ってください)
+    // APIへの負荷を考慮し、1秒待機
     Utilities.sleep(1000);
 
     // 日付を1日進める
     currentDate.setDate(currentDate.getDate() + 1);
   }
 
-  Logger.info("end to search resources");
+  var oValues = [];
+  for (var code in collectedDocumentId) {
+    oValues.push([code, collectedFilerName[code], collectedDocumentId[code], collectedPdf[code], collectedYahooFinance[code]]);
+  }
 
-  var thisSpreadsheet = SpreadsheetApp.openById("1lB_oDt51M5Rm5lJHkWdTr-rWWLxqG5RAETNOd2encrg");
-  var sheet = thisSpreadsheet.getSheetByName("Lists");
+  // 指定の Spreadsheetへの書き出し
+  var thisSpreadsheet = SpreadsheetApp.openById("----myspreadsheet----");
+  var sheet = thisSpreadsheet.getSheetByName("--mysheet--");
+
   if (sheet) {
-    var row = sheet.getLastRow() + 1; // 最終行の次から書き出し (ヘッダーがある場合は調整)
+    var rowSize = oValues.length    //  貼り付け行サイズ
+    var colSize = oValues[0].length //  貼り付け列サイズ
 
-    var writeDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
-    for (var code in collectedPdfs) {
-      if (collectedPdfs.hasOwnProperty(code)) {
-        sheet.getRange(row, 1).setValue(code);      // 証券コード
-        sheet.getRange(row, 2).setValue(collectedFilerName[code])
-        sheet.getRange(row, 3).setValue(collectedPdfs[code]); // PDF URL
-        sheet.getRange(row, 4).setValue(`https://finance.yahoo.co.jp/quote/${code}.T`);
-        sheet.getRange(row, 5).setValue(writeDate); // 取得日時
-        row++;
-      }
-    }
-    Logger.info("wrote resouces to the sheet of " + sheet.getName());
-  } else {
-    Logger.warn(sheet.getName() + "No such sheet");
+    sheet.clearContents();      // シートクリア
+    sheet.getRange(1,1,rowSize,colSize).setValues(oValues);
   }
 }
-
